@@ -1,0 +1,123 @@
+let theWorld;
+let BochoAmarillo;
+
+// Load the image.
+function preload() {
+  theWorld = loadImage("/assets/laberinto.png");
+}
+
+function setup() {
+  createCanvas(1280, 803);
+  frameRate(20);
+  image(theWorld, 0, 0);
+  BochoAmarillo = new BochoBot(125, 220, 90, 50, theWorld);
+}
+
+function draw() {
+  image(theWorld, 0, 0);
+  BochoAmarillo.move();
+  BochoAmarillo.draw();
+}
+
+class BochoBot {
+  constructor(x, y, angle, size, world) {
+    this.x = x;
+    this.y = y;
+    this.angle = angle * PI / 180.0;
+    this.radius = size;
+    this.size_sensor = this.radius / 5;
+    this.world = world;
+    this.step_size = 5;
+    this.step_angle = PI / 20; // Rotación más suave
+  }
+
+  draw() {
+    let status_sensor = this.read_sensors();
+    push();
+    translate(this.x, this.y);
+    rotate(this.angle);
+    noStroke();
+    fill(236, 189, 64);
+    circle(0, 0, this.radius);
+    
+    // Dibujar el estado de los sensores
+    for (let i = 0; i < status_sensor.length; i++) {
+      fill(status_sensor[i] == 0 ? color(255, 0, 0) : color(200, 255, 0));
+      circle((i % 2 === 0 ? -1 : 1) * this.radius / 2, (Math.floor(i / 2) - 0.5) * this.radius / 2, this.size_sensor);
+    }
+    pop();
+  }
+
+  read_sensors() {
+    let sensors = [];
+    
+    // Sensor izquierdo (cercano)
+    let vsl = createVector(this.radius * 1, -this.radius / 2);
+    vsl.rotate(this.angle);
+    let pixelColorL = this.world.get(this.x + vsl.x, this.y + vsl.y);
+    sensors.push(pixelColorL[0] < 200 ? 0 : 1); // Umbral para detectar pared
+
+    // Sensor derecho (cercano)
+    let vsr = createVector(this.radius * 1, this.radius / 2);
+    vsr.rotate(this.angle);
+    let pixelColorR = this.world.get(this.x + vsr.x, this.y + vsr.y);
+    sensors.push(pixelColorR[0] < 200 ? 0 : 1); // Umbral para detectar pared
+
+    // Sensor izquierdo (lejano)
+    let vslFar = createVector(this.radius * 1, -this.radius / 2);
+    vslFar.rotate(this.angle);
+    let pixelColorLF = this.world.get(this.x + vslFar.x, this.y + vslFar.y);
+    sensors.push(pixelColorLF[0] < 200 ? 0 : 1); // Umbral para detectar pared
+
+    // Sensor derecho (lejano)
+    let vsrFar = createVector(this.radius * 1, this.radius / 2);
+    vsrFar.rotate(this.angle);
+    let pixelColorRF = this.world.get(this.x + vsrFar.x, this.y + vsrFar.y);
+    sensors.push(pixelColorRF[0] < 200 ? 0 : 1); // Umbral para detectar pared
+
+    return sensors; // Devuelve el estado de todos los sensores
+  }
+
+  move() {
+    let status_sensor = this.read_sensors();
+    
+    // Movimiento
+    if (status_sensor[0] == 0 && status_sensor[1] == 0) {
+      // Ambos sensores cercanos detectan pared
+      if (status_sensor[2] == 1 && status_sensor[3] == 0) {
+        this.rotate_right(); // Girar a la derecha si el sensor lejano izquierdo no detecta pared
+      } else {
+        this.rotate_left(); // Girar a la izquierda si el sensor lejano derecho detecta pared
+      }
+    } else if (status_sensor[0] == 0) {
+      this.rotate_right(); // Girar a la derecha si solo el sensor izquierdo cercano detecta pared
+    } else if (status_sensor[1] == 0) {
+      this.rotate_left(); // Girar a la izquierda si solo el sensor derecho cercano detecta pared
+    } else {
+      this.advance(); // Avanzar si no hay paredes
+    }
+
+    // Si se detectan esquinas, cambiar la dirección aleatoriamente
+    if (status_sensor[0] == 0 && status_sensor[1] == 0 && 
+        status_sensor[2] == 0 && status_sensor[3] == 0) {
+      this.angle += random(-PI / 2, PI / 2); // Cambiar la dirección aleatoriamente
+    }
+  }
+
+  advance() {
+    this.x += this.step_size * cos(this.angle);
+    this.y += this.step_size * sin(this.angle);
+    
+    // Control de límites
+    this.x = constrain(this.x, 0, width);
+    this.y = constrain(this.y, 0, height);
+  }
+
+  rotate_left() {
+    this.angle -= this.step_angle; // Girar a la izquierda
+  }
+
+  rotate_right() {
+    this.angle += this.step_angle; // Girar a la derecha
+  }
+}
